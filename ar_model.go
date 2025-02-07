@@ -72,7 +72,7 @@ func (p *Predictor) Predict(numToPredict int) ([][]float64, error) {
 
 	// 4. Calculate 'theta' (th), coefficients of AR model, use Least Squares to estimate the vector th.
 	th, err := calculateTheta(phi, dataValues)
-	if err != nil {
+	if err != nil && err != mat.ErrSingular {
 		return nil, fmt.Errorf("error calculating theta: %w", err)
 	}
 
@@ -86,7 +86,7 @@ func (p *Predictor) Predict(numToPredict int) ([][]float64, error) {
 		result[i] = []float64{pl[i], yAp[i]}
 	}
 
-	return result, nil
+	return result, err
 }
 
 // extendTimeValues extends the time values array with projected future time values, using a linear projection.
@@ -187,14 +187,16 @@ func calculateTheta(phi *mat.Dense, dataValues []float64) (*mat.Dense, error) {
 	phiTP.Mul(phiT, yVec)
 
 	phiTphiInv := mat.NewDense(cols, cols, nil)
-	if err := phiTphiInv.Inverse(phiTphi); err != nil {
+	err := phiTphiInv.Inverse(phiTphi)
+	// if resulting is close to singular it might be imprecise but still computable
+	if err != nil && err != mat.ErrSingular {
 		return nil, fmt.Errorf("matrix inversion failed: %w", err)
 	}
 
 	th := mat.NewDense(cols, 1, nil)
 	th.Mul(phiTphiInv, phiTP)
 
-	return th, nil
+	return th, err
 }
 
 // --------------------------------------------------
