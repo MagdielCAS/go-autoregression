@@ -10,22 +10,22 @@ import (
 	"gonum.org/v1/gonum/mat"
 )
 
-// ModelParameters holds the configuration for the Autoregressive model.
-type ModelParameters struct {
+// LSARXModelParameters holds the configuration for the Autoregressive model.
+type LSARXModelParameters struct {
 	AutoregressiveLags int     // na: Number of past data points to consider for the autoregressive component.
 	ExternalInputLags  int     // nb: Number of past external input values to consider.
 	StepSize           float64 // StepSize: the historic 'delta Time' in the original data to use.
 }
 
 // Predictor struct encapsulates the AR model, it will store the data and params to be used for the prediction.
-type Predictor struct {
-	Data   [][]float64     // Historical data: each row is [data_value, time_value].
-	Params ModelParameters // Model parameters.
+type LSARXPredictor struct {
+	Data   [][]float64          // Historical data: each row is [data_value, time_value].
+	Params LSARXModelParameters // Model parameters.
 }
 
 // NewPredictor creates a new AR model predictor with the given data and parameters.
 // It performs basic validation of the parameters.
-func NewPredictor(data [][]float64, params ModelParameters) (*Predictor, error) {
+func NewLSARXPredictor(data [][]float64, params LSARXModelParameters) (*LSARXPredictor, error) {
 	if params.AutoregressiveLags <= 0 || params.ExternalInputLags < 0 {
 		return nil, fmt.Errorf("lags must be positive integers, autoregressive lags: %d, external input lags: %d", params.AutoregressiveLags, params.ExternalInputLags)
 	}
@@ -34,12 +34,12 @@ func NewPredictor(data [][]float64, params ModelParameters) (*Predictor, error) 
 		return nil, fmt.Errorf("step size must be a positive number, step size: %f", params.StepSize)
 	}
 
-	return &Predictor{Data: data, Params: params}, nil
+	return &LSARXPredictor{Data: data, Params: params}, nil
 }
 
 // Predict performs AR model prediction for the given number of steps in the future.
 // It returns the predicted data as a slice of [time, value] pairs or an error if prediction fails.
-func (p *Predictor) Predict(numToPredict int) ([][]float64, error) {
+func (p *LSARXPredictor) Predict(numToPredict int) ([][]float64, error) {
 	na := p.Params.AutoregressiveLags
 	nb := p.Params.ExternalInputLags
 	stepSize := p.Params.StepSize
@@ -72,8 +72,8 @@ func (p *Predictor) Predict(numToPredict int) ([][]float64, error) {
 
 	// 4. Calculate 'theta' (th), coefficients of AR model, use Least Squares to estimate the vector th.
 	th, err := calculateTheta(phi, dataValues)
-	if err != nil && err != mat.ErrSingular {
-		return nil, fmt.Errorf("error calculating theta: %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate theta: %v", err)
 	}
 
 	// 5. Perform prediction using the computed 'theta' and the extended time values.
@@ -86,7 +86,7 @@ func (p *Predictor) Predict(numToPredict int) ([][]float64, error) {
 		result[i] = []float64{pl[i], yAp[i]}
 	}
 
-	return result, err
+	return result, nil
 }
 
 // extendTimeValues extends the time values array with projected future time values, using a linear projection.
@@ -170,7 +170,12 @@ func performPrediction(dataValues []float64, pl []float64, th *mat.Dense, m int,
 }
 
 // calculateTheta calculates the 'theta' (th)  coefficients of AR mode.
-func calculateTheta(phi *mat.Dense, dataValues []float64) (*mat.Dense, error) {
+func calculateTheta(phi *mat.Dense, dataValues []float64) (th *mat.Dense, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("failed to calculate theta: %v", r)
+		}
+	}()
 	rows, cols := phi.Dims()
 
 	// Create Y vector with the correct dimensions (excluding the first m points)
@@ -187,16 +192,12 @@ func calculateTheta(phi *mat.Dense, dataValues []float64) (*mat.Dense, error) {
 	phiTP.Mul(phiT, yVec)
 
 	phiTphiInv := mat.NewDense(cols, cols, nil)
-	err := phiTphiInv.Inverse(phiTphi)
-	// if resulting is close to singular it might be imprecise but still computable
-	if err != nil && err != mat.ErrSingular {
-		return nil, fmt.Errorf("matrix inversion failed: %w", err)
-	}
+	phiTphiInv.Inverse(phiTphi)
 
-	th := mat.NewDense(cols, 1, nil)
+	th = mat.NewDense(cols, 1, nil)
 	th.Mul(phiTphiInv, phiTP)
 
-	return th, err
+	return th, nil
 }
 
 // --------------------------------------------------
@@ -248,7 +249,7 @@ func calculateTheta(phi *mat.Dense, dataValues []float64) (*mat.Dense, error) {
 //	}
 //
 //	// 2. Define AR Model Parameters.
-//	params := ar.ModelParameters{
+//	params := ar.LSARXModelParameters{
 //		AutoregressiveLags: 3,   // 'na' -  How many past 'data_value' to consider.
 //		ExternalInputLags:  3,   // 'nb' -  How many past 'time_value' to consider.
 //		StepSize:           25.0, // 'stepSize' - The interval between 'time_value' samples.

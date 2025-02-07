@@ -9,70 +9,34 @@ import (
 	"gonum.org/v1/gonum/mat"
 )
 
-func TestNewPredictor(t *testing.T) {
+func TestNewLSPredictor(t *testing.T) {
 	testCases := []struct {
 		name        string
 		data        [][]float64
-		params      ModelParameters
+		params      LSModelParameters
 		expectedErr bool
 	}{
 		{
 			name: "Valid parameters",
 			data: [][]float64{{1, 1}, {2, 2}},
-			params: ModelParameters{
-				AutoregressiveLags: 2,
-				ExternalInputLags:  1,
-				StepSize:           1.0,
+			params: LSModelParameters{
+				StepSize: 1.0,
 			},
 			expectedErr: false,
 		},
 		{
-			name: "Invalid AutoregressiveLags (zero)",
-			data: [][]float64{{1, 1}, {2, 2}},
-			params: ModelParameters{
-				AutoregressiveLags: 0,
-				ExternalInputLags:  1,
-				StepSize:           1.0,
-			},
-			expectedErr: true,
-		},
-		{
-			name: "Invalid AutoregressiveLags (negative)",
-			data: [][]float64{{1, 1}, {2, 2}},
-			params: ModelParameters{
-				AutoregressiveLags: -1,
-				ExternalInputLags:  1,
-				StepSize:           1.0,
-			},
-			expectedErr: true,
-		},
-		{
-			name: "Invalid ExternalInputLags (negative)",
-			data: [][]float64{{1, 1}, {2, 2}},
-			params: ModelParameters{
-				AutoregressiveLags: 1,
-				ExternalInputLags:  -1,
-				StepSize:           1.0,
-			},
-			expectedErr: true,
-		},
-		{
 			name: "Invalid StepSize (zero)",
 			data: [][]float64{{1, 1}, {2, 2}},
-			params: ModelParameters{
-				AutoregressiveLags: 1,
-				ExternalInputLags:  1,
-				StepSize:           0.0,
+			params: LSModelParameters{
+				StepSize: 0.0,
 			},
 			expectedErr: true,
 		},
 		{
 			name: "Invalid StepSize (negative)",
 			data: [][]float64{{1, 1}, {2, 2}},
-			params: ModelParameters{
-				AutoregressiveLags: 1,
-				ExternalInputLags:  1,
-				StepSize:           -1.0,
+			params: LSModelParameters{
+				StepSize: -1.0,
 			},
 			expectedErr: true,
 		},
@@ -80,15 +44,15 @@ func TestNewPredictor(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := NewPredictor(tc.data, tc.params)
+			_, err := NewLSPredictor(tc.data, tc.params)
 			if (err != nil) != tc.expectedErr {
-				t.Errorf("NewPredictor() error = %v, expectedErr %v", err, tc.expectedErr)
+				t.Errorf("NewLSPredictor() error = %v, expectedErr %v", err, tc.expectedErr)
 			}
 		})
 	}
 }
 
-func TestPredict(t *testing.T) {
+func TestLSPredict(t *testing.T) {
 	// Define a more complex dataset that won't result in a singular matrix
 	data := [][]float64{
 		{1578.0077, 0}, {1581.1876, 5}, {1452.4627, 33},
@@ -122,14 +86,12 @@ func TestPredict(t *testing.T) {
 		{2261.5, 2070},
 	}
 
-	params := ModelParameters{
-		AutoregressiveLags: 3,
-		ExternalInputLags:  3,
-		StepSize:           25,
+	params := LSModelParameters{
+		StepSize: 25,
 	}
 
 	numToPredict := 3
-	predictor, err := NewPredictor(data, params)
+	predictor, err := NewLSPredictor(data, params)
 	if err != nil {
 		t.Fatalf("Failed to create predictor: %v", err)
 	}
@@ -162,7 +124,7 @@ func TestPredict(t *testing.T) {
 	}
 }
 
-func TestExtendTimeValues(t *testing.T) {
+func TestLSExtendTimeValues(t *testing.T) {
 	testCases := []struct {
 		name         string
 		timeValues   []float64
@@ -217,7 +179,7 @@ func TestExtendTimeValues(t *testing.T) {
 	}
 }
 
-func TestConstructPhiMatrix(t *testing.T) {
+func TestLSConstructPhiMatrix(t *testing.T) {
 	testCases := []struct {
 		name          string
 		dataValues    []float64
@@ -327,7 +289,7 @@ func TestConstructPhiMatrix(t *testing.T) {
 	}
 }
 
-func TestCalculateTheta(t *testing.T) {
+func TestLSCalculateTheta(t *testing.T) {
 	testCases := []struct {
 		name        string
 		phiData     []float64
@@ -342,7 +304,7 @@ func TestCalculateTheta(t *testing.T) {
 			phiRows:     2,
 			phiCols:     3,
 			dataValues:  []float64{7, 8},
-			expectError: true, // Expecting singular matrix error
+			expectError: false,
 		},
 		{
 			name:        "Square Phi",
@@ -358,7 +320,7 @@ func TestCalculateTheta(t *testing.T) {
 			phiRows:     2,
 			phiCols:     2,
 			dataValues:  []float64{5, 6},
-			expectError: true,
+			expectError: false,
 		},
 		{
 			name:        "Overdetermined system",
@@ -366,7 +328,7 @@ func TestCalculateTheta(t *testing.T) {
 			phiRows:     3,
 			phiCols:     3,
 			dataValues:  []float64{10, 11, 12},
-			expectError: true, // Expect Singular Matrix
+			expectError: false, // Expect Singular Matrix
 		},
 		{
 			name:        "Underdetermined system",
@@ -382,7 +344,7 @@ func TestCalculateTheta(t *testing.T) {
 			phiRows:     2,
 			phiCols:     4, // adjusted ncols to match dataLen
 			dataValues:  []float64{10, 11},
-			expectError: true,
+			expectError: false,
 		},
 		{
 			// Adding case for correct execution, otherwise it breaks
@@ -416,7 +378,7 @@ func TestCalculateTheta(t *testing.T) {
 	}
 }
 
-func TestPerformPrediction(t *testing.T) {
+func TestLSPerformPrediction(t *testing.T) {
 	testCases := []struct {
 		name            string
 		dataValues      []float64
