@@ -1,6 +1,14 @@
-# ar: Autoregressive Time Series Prediction Package
+go-autoregression
+=======
+[![GoDoc](https://godoc.org/github.com/MagdielCAS/go-autoregression?status.svg)](https://godoc.org/github.com/MagdielCAS/go-autoregression)
+[![Go Report Card](https://goreportcard.com/badge/MagdielCAS/go-autoregression)](https://goreportcard.com/report/MagdielCAS/go-autoregression)
+[![License][license-image]][license-url]
 
-[![Go Reference](https://pkg.go.dev/badge/path/to/ar.svg)](https://pkg.go.dev/path/to/ar)
+[license-image]: https://img.shields.io/badge/license-BS2-green.svg?style=flat-square
+[license-url]: LICENSE
+
+
+# ar: Autoregressive Time Series Prediction Package
 
 Package `ar` provides a simple implementation of an Autoregressive (AR) model for time series prediction in Go.  It allows you to predict future values of a time series based on its past values and associated parameters.  This package is designed to be easy to use and understand, making it suitable for learning about AR models or for quick prototyping.
 
@@ -76,6 +84,8 @@ func main() {
 }
 ```
 
+------------
+
 ## API Reference
 
 ### `type ModelParameters`
@@ -110,6 +120,8 @@ Performs the prediction.
 * `numToPredict`:  The number of steps into the future to predict.
 
 Returns a slice of slices, where each inner slice contains two floats: `[predicted_time, predicted_value]`.  Returns an error if the prediction fails (e.g., not enough data to perform the prediction given the specified lags).
+
+------------
 
 ## What the Code Does: Prediction Based on Past Behavior
 
@@ -183,6 +195,8 @@ The mathematical technique used to find the best weights is based on a fundament
 * **External Factors. (P Values)** Uses and additional array `P` of parameters that has influence in the prediction, this improves the approach, and provides versatility.
 
 The code you provided is a basic implementation of an AR model.  Real-world time series forecasting often involves more complex models and techniques, but this gives you a fundamental understanding of the core concepts.
+
+------------
 
 ## Contributing
 
